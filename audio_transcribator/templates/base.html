@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}&#1057;&#1090;&#1077;&#1085;&#1086;&#1075;&#1088;&#1072;&#1084;&#1084;&#1072;{% endblock %}</title>
+    <link rel="stylesheet" href="/static/styles.css?v=benchmark-1">
+    {% block head_extra %}{% endblock %}
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/ui/upload">&#1057;&#1090;&#1077;&#1085;&#1086;&#1075;&#1088;&#1072;&#1084;&#1084;&#1072;</a>
+      <div class="topbar-actions">
+        <a class="button-link secondary" href="/ui/benchmark">Оценка диаризации</a>
+        <form method="post" action="/ui/logout">
+          <button class="ghost-button" type="submit">&#1042;&#1099;&#1081;&#1090;&#1080;</button>
+        </form>
+      </div>
+    </header>
+    <main class="page">
+      {% block content %}{% endblock %}
+    </main>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

@@ -1,0 +1,8 @@
+[
+  {
+    "id": "local:whisperx-large",
+    "label": "WhisperX large-v3",
+    "provider": "whisperx",
+    "model": "large-v3"
+  }
+]

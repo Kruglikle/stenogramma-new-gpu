@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block title %}{{ result.title }} | Стенограмма{% endblock %}
+
+{% block content %}
+<div class="workspace-layout">
+  <div class="workspace-main">
+    <section class="panel" data-job-id="{{ result.job_id }}" data-job-status="{{ result.status }}">
+      <div class="section-header result-header">
+        <div class="result-title-block">
+          <h1>{{ result.title }}</h1>
+          <p class="muted">ID задачи: {{ result.job_id }}</p>
+        </div>
+        <div class="actions result-actions">
+          <span id="job-status" class="status-badge status-{{ result.status }}">{{ result.status_label }}</span>
+          <a class="button-link secondary" href="/ui/result/{{ result.job_id }}">Обновить</a>
+          <a class="button-link" href="/ui/upload">Создать задачу</a>
+        </div>
+      </div>
+
+      <form class="title-form" method="post" action="/ui/result/{{ result.job_id }}/title">
+        <input name="title" type="text" maxlength="160" value="{{ result.title }}" aria-label="Название файла">
+        <button class="secondary" type="submit">Сохранить название</button>
+      </form>
+
+      <div id="downloads">
+        {% if downloads %}
+          <div class="downloads">
+            {% for filename in downloads %}
+              <a class="{% if filename == 'stenogramma.txt' or filename == 'diarized_transcript.txt' or filename == 'summary.txt' %}primary-download{% endif %}" href="/ui/download/{{ result.job_id }}/{{ filename }}">
+                Скачать
+                {% if filename == 'stenogramma.txt' %}стенограмму{% elif filename == 'diarized_transcript.txt' %}стенограмму со спикерами{% elif filename == 'summary.txt' %}резюме{% elif filename == 'run.log' %}лог{% else %}{{ filename }}{% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted status-note">Файлы появятся здесь по мере обработки.</p>
+        {% endif %}
+      </div>
+    </section>
+
+    <div id="progress-panel">
+      <section class="panel progress-panel">
+        <div class="section-header compact-header">
+          <div>
+            <h2>Прогресс обработки</h2>
+            <p class="muted">{{ result.progress.label }}{% if result.progress.detail %}: {{ result.progress.detail }}{% endif %}</p>
+          </div>
+          <strong class="progress-percent" data-progress-percent>{{ result.progress.percent }}%</strong>
+        </div>
+        <div class="task-progress-track" aria-label="Прогресс обработки">
+          <div class="task-progress-bar status-{{ result.progress.status }}{% if result.progress.status == 'running' or result.progress.status == 'started' %} is-live{% endif %}" data-progress-bar style="width: {{ result.progress.percent }}%"></div>
+        </div>
+      </section>
+    </div>
+
+    <div id="timings-panel">
+      {% if result.timings and result.timings["items"] %}
+      <section class="panel timings-panel">
+        <div class="section-header compact-header">
+          <div>
+            <h2>Время обработки</h2>
+            {% if result.timings.total_duration %}
+              <p class="muted">Всего: {{ result.timings.total_duration }}</p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="timings-list">
+          {% for timing in result.timings["items"] %}
+            <div class="timing-row">
+              <span>{{ timing.label }}</span>
+              <span class="timing-status timing-status-{{ timing.status }}">{{ timing.status_label }}</span>
+              <strong>{{ timing.duration }}</strong>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    </div>
+
+    <div id="diarization-panel">
+      {% if result.diarization_error %}
+      <section class="panel">
+        <p class="error">Диаризация не выполнена: {{ result.diarization_error }}</p>
+      </section>
+      {% endif %}
+      {% if result.diarized_transcript %}
+      <section class="panel">
+        <div class="section-header compact-header">
+          <div>
+            <h2>Стенограмма со спикерами</h2>
+          </div>
+          <div class="actions panel-actions">
+            <a class="button-link secondary" href="/ui/download/{{ result.job_id }}/diarized_transcript.txt">Скачать стенограмму со спикерами</a>
+          </div>
+        </div>
+        <pre>{{ result.diarized_transcript }}</pre>
+      </section>
+      {% endif %}
+    </div>
+
+    <div id="summary-panel">
+      {% if result.summary %}
+      <section class="panel">
+        <h2>Резюме</h2>
+        <pre>{{ result.summary }}</pre>
+      </section>
+      {% endif %}
+    </div>
+
+    <div id="transcript-panel">
+      {% if result.transcript %}
+      <section class="panel">
+        <div class="section-header compact-header">
+          <div>
+            <h2>Стенограмма</h2>
+          </div>
+          <div class="actions panel-actions">
+            <a class="button-link secondary" href="/ui/download/{{ result.job_id }}/stenogramma.txt">Скачать стенограмму</a>
+          </div>
+        </div>
+        <pre>{{ result.transcript }}</pre>
+      </section>
+      {% endif %}
+    </div>
+
+    <div id="log-panel">
+      {% if result.log_tail %}
+      <section class="panel diagnostics-panel">
+        <div class="section-header compact-header">
+          <div>
+            <h2>Диагностика</h2>
+            <p class="muted">Технический журнал последних событий задачи.</p>
+          </div>
+        </div>
+        <details class="log-details">
+          <summary>Показать журнал обработки</summary>
+          <pre class="log-output">{{ result.log_tail }}</pre>
+        </details>
+      </section>
+      {% else %}
+      <section class="panel">
+        <h2>Статус</h2>
+        <p class="muted">Обработка ещё не завершена. Страница обновляется автоматически.</p>
+      </section>
+      {% endif %}
+    </div>
+  </div>
+  {% include "_cabinet_history.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/cabinet.js?v=cabinet-2"></script>
+<script>
+  (() => {
+    const root = document.querySelector("[data-job-id]");
+    if (!root) return;
+
+    const jobId = root.dataset.jobId;
+    const terminalStatuses = new Set(["completed", "completed_without_summary", "failed"]);
+    let currentStatus = root.dataset.jobStatus;
+    let displayedProgress = parseFloat(document.querySelector("[data-progress-percent]")?.textContent) || 0;
+    let progressAnimation = null;
+
+    const setProgress = (value) => {
+      const percent = Math.max(0, Math.min(100, value));
+      const percentText = document.querySelector("[data-progress-percent]");
+      const bar = document.querySelector("[data-progress-bar]");
+      if (percentText) percentText.textContent = `${percent.toFixed(1).replace(".0", "")}%`;
+      if (bar) bar.style.width = `${percent}%`;
+      displayedProgress = percent;
+    };
+
+    const animateProgressTo = (target) => {
+      const next = Math.max(displayedProgress, Math.max(0, Math.min(100, target)));
+      const start = displayedProgress;
+      const delta = next - start;
+      if (progressAnimation) window.cancelAnimationFrame(progressAnimation);
+      if (delta <= 0.05) {
+        setProgress(next);
+        return;
+      }
+
+      const startedAt = performance.now();
+      const duration = Math.min(4200, Math.max(900, delta * 90));
+      const tick = (now) => {
+        const t = Math.min((now - startedAt) / duration, 1);
+        const eased = 1 - Math.pow(1 - t, 3);
+        setProgress(start + delta * eased);
+        if (t < 1) {
+          progressAnimation = window.requestAnimationFrame(tick);
+        }
+      };
+      progressAnimation = window.requestAnimationFrame(tick);
+    };
+
+    const updateProgressPanel = (doc) => {
+      const currentPanel = document.getElementById("progress-panel");
+      const nextPanel = doc.getElementById("progress-panel");
+      if (!currentPanel || !nextPanel) return;
+
+      const currentLabel = currentPanel.querySelector(".muted");
+      const nextLabel = nextPanel.querySelector(".muted");
+      if (currentLabel && nextLabel) currentLabel.textContent = nextLabel.textContent;
+
+      const nextPercentText = nextPanel.querySelector("[data-progress-percent]");
+      const nextBar = nextPanel.querySelector("[data-progress-bar]");
+      const currentBar = currentPanel.querySelector("[data-progress-bar]");
+      if (currentBar && nextBar) currentBar.className = nextBar.className;
+
+      const target = parseFloat(nextPercentText?.textContent || "0");
+      animateProgressTo(Number.isFinite(target) ? target : displayedProgress);
+    };
+
+    const poll = async () => {
+      if (terminalStatuses.has(currentStatus)) return;
+
+      try {
+        const response = await fetch(`/ui/result/${jobId}`, {
+          headers: { "Accept": "text/html" },
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const nextRoot = doc.querySelector("[data-job-id]");
+        if (!nextRoot) return;
+
+        const nextStatus = doc.getElementById("job-status");
+        const status = document.getElementById("job-status");
+        if (nextStatus && status) {
+          status.className = nextStatus.className;
+          status.textContent = nextStatus.textContent;
+        }
+
+        updateProgressPanel(doc);
+
+        for (const id of ["downloads", "timings-panel", "diarization-panel", "summary-panel", "transcript-panel", "log-panel", "cabinet-sidebar"]) {
+          const current = document.getElementById(id);
+          const next = doc.getElementById(id);
+          if (current && next) {
+            current.innerHTML = next.innerHTML;
+          }
+        }
+
+        currentStatus = nextRoot.dataset.jobStatus;
+      } catch (error) {
+        console.warn("Не удалось обновить результат", error);
+      }
+    };
+
+    const timer = window.setInterval(async () => {
+      await poll();
+      if (terminalStatuses.has(currentStatus)) {
+        window.clearInterval(timer);
+      }
+    }, 5000);
+
+    poll();
+  })();
+</script>
+{% endblock %}

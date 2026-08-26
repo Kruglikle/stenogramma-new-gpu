@@ -1,0 +1,44 @@
+<aside id="cabinet-sidebar" class="cabinet-sidebar" aria-label="Проанализированные файлы">
+  <div class="cabinet-header">
+    <div>
+      <h2>Проанализированные файлы</h2>
+      <p class="muted">{{ current_username }}</p>
+    </div>
+  </div>
+
+  {% if storage_quota %}
+    <div class="storage-quota">
+      <div class="storage-quota-row">
+        <span>Память</span>
+        <strong>{{ storage_quota.used }} / {{ storage_quota.limit }}</strong>
+      </div>
+      <div class="storage-quota-bar" aria-hidden="true">
+        <span style="width: {{ storage_quota.percent if storage_quota.percent < 100 else 100 }}%"></span>
+      </div>
+      <p class="muted">Свободно: {{ storage_quota.remaining }}</p>
+    </div>
+  {% endif %}
+
+  {% if cabinet_jobs %}
+    <div class="cabinet-list">
+      {% for item in cabinet_jobs %}
+        <article class="cabinet-item status-left-{{ item.status }}" data-history-url="/ui/result/{{ item.job_id }}" tabindex="0">
+          <div class="cabinet-item-main">
+            <a class="cabinet-title" href="/ui/result/{{ item.job_id }}">{{ item.title }}</a>
+            <span class="cabinet-meta">{{ item.status_label }}</span>
+          </div>
+          <div class="cabinet-item-actions">
+            {% if item.download_file %}
+              <a class="cabinet-icon-link" href="/ui/download/{{ item.job_id }}/{{ item.download_file }}" title="Скачать">↓</a>
+            {% endif %}
+            <form method="post" action="/ui/result/{{ item.job_id }}/delete" data-delete-form data-delete-title="{{ item.title }}">
+              <button class="cabinet-delete" type="submit" title="Удалить">×</button>
+            </form>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="muted cabinet-empty">Сохранённые результаты появятся после первой обработки.</p>
+  {% endif %}
+</aside>

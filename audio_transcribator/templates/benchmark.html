@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Оценка качества и скорости | Стенограмма{% endblock %}
+
+{% block content %}
+<div class="workspace-layout benchmark-layout">
+  <div class="workspace-main">
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h1>Оценка качества и скорости</h1>
+          <p class="muted">Проверяем диаризацию или транскрибацию на одном датасете.</p>
+        </div>
+      </div>
+
+      <form class="form benchmark-form" method="post" action="/ui/benchmark/start">
+        {% if error %}
+          <p class="error">{{ error }}</p>
+        {% endif %}
+        <div class="benchmark-controls">
+          <label>
+            Что проверяем
+            <select name="benchmark_type">
+              <option value="diarization">Диаризация</option>
+              <option value="transcription">Транскрибация</option>
+            </select>
+          </label>
+          <label>
+            Сколько файлов
+            <input name="limit" type="number" min="1" step="1" value="1">
+          </label>
+          <label>
+            С какого файла
+            <input name="offset" type="number" min="0" step="1" value="0">
+          </label>
+          <label>
+            Устройство
+            <select name="device">
+              <option value="cpu">CPU</option>
+              <option value="cuda">GPU / CUDA</option>
+              <option value="auto">Авто</option>
+            </select>
+          </label>
+        </div>
+        <label class="checkbox-field">
+          <input name="save_artifacts" type="checkbox" value="1" checked>
+          <span>Артефакты</span>
+          <span class="tooltip" tabindex="0" aria-label="Артефакты - это подробные файлы по каждому аудио. Для диаризации сохраняются audio.wav, эталон и предсказание. Для транскрибации сохраняются audio.wav, эталонный текст и текст сервиса. Включайте для 1-10 файлов, для 50+ лучше выключать.">?</span>
+        </label>
+        <button type="submit" {% if active_run_id %}disabled{% endif %}>Запустить проверку</button>
+        {% if active_run_id %}
+          <p class="muted">Сейчас выполняется запуск {{ active_run_id }}. Страница обновляется автоматически.</p>
+        {% endif %}
+      </form>
+    </section>
+
+    <section class="panel benchmark-help">
+      <h2>Что считаем</h2>
+      <div class="help-grid">
+        <p><strong>Диаризация</strong> - кто и в какие моменты говорил.</p>
+        <p><strong>Транскрибация</strong> - насколько правильно распознан текст.</p>
+        <p><strong>DER/JER</strong> - ошибки диаризации. Меньше значит лучше.</p>
+        <p><strong>WER/CER</strong> - ошибки текста по словам и символам. Меньше значит лучше.</p>
+        <p><strong>Miss/FA/Confusion</strong> - пропущенная речь, лишняя речь, перепутанные спикеры.</p>
+        <p><strong>RTF</strong> - скорость. Меньше 1 значит быстрее длительности аудио.</p>
+      </div>
+    </section>
+
+    {% if selected_run %}
+      <section class="panel">
+        <div class="section-header compact-header">
+          <div>
+            <h2>{{ selected_run.type_label }}</h2>
+            <p class="muted">{{ selected_run.id }} · {{ selected_run.created_at }}</p>
+          </div>
+          {% if selected_run.status == "running" %}
+            <span class="status-badge status-running">Выполняется</span>
+          {% elif selected_run.status == "completed" %}
+            <span class="status-badge status-completed">Завершён</span>
+          {% elif selected_run.status == "failed" %}
+            <span class="status-badge status-failed">Ошибка</span>
+          {% else %}
+            <span class="status-badge">{{ selected_run.status }}</span>
+          {% endif %}
+        </div>
+
+        {% if selected_run.aggregate %}
+          <div class="benchmark-metrics">
+            <div><span>Файлов</span><strong>{{ selected_run.aggregate.successful_files }} / {{ selected_run.aggregate.total_files }}</strong></div>
+            <div><span>Ошибок запуска</span><strong>{{ selected_run.aggregate.failed_files }}</strong></div>
+            <div><span>RTF</span><strong>{{ selected_run.aggregate.rtf }}</strong></div>
+
+            {% if selected_run.type == "transcription" %}
+              <div><span>WER</span><strong>{{ selected_run.aggregate.mean_wer }}</strong></div>
+              <div><span>CER</span><strong>{{ selected_run.aggregate.mean_cer }}</strong></div>
+              <div><span>WER без регистра и пунктуации</span><strong>{{ selected_run.aggregate.mean_normalized_wer }}</strong></div>
+            {% else %}
+              <div><span>DER</span><strong>{{ selected_run.aggregate.aggregate_der }}</strong></div>
+              <div><span>JER</span><strong>{{ selected_run.aggregate.mean_jer }}</strong></div>
+              <div><span>Совпало число спикеров</span><strong>{{ selected_run.aggregate.speaker_count_exact_match_rate }}</strong></div>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="muted status-note">Метрики появятся после обработки первого файла.</p>
+        {% endif %}
+
+        {% if selected_run.files %}
+          <div class="downloads benchmark-downloads">
+            {% for filename in selected_run.files %}
+              {% if filename in ["summary.md", "asr_summary.md"] %}
+                <a class="primary-download" href="/ui/benchmark/download/{{ selected_run.id }}/{{ filename }}">Сводка</a>
+              {% elif filename in ["per_file_metrics.csv", "asr_per_file_metrics.csv"] %}
+                <a href="/ui/benchmark/download/{{ selected_run.id }}/{{ filename }}">Метрики по файлам</a>
+              {% elif filename in ["aggregate_metrics.json", "asr_aggregate_metrics.json"] %}
+                <a href="/ui/benchmark/download/{{ selected_run.id }}/{{ filename }}">Общие метрики</a>
+              {% elif filename in ["errors.jsonl", "asr_errors.jsonl"] %}
+                <a href="/ui/benchmark/download/{{ selected_run.id }}/{{ filename }}">Ошибки</a>
+              {% elif filename == "run.log" %}
+                <a href="/ui/benchmark/download/{{ selected_run.id }}/{{ filename }}">Технический лог</a>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="muted status-note">Файлы отчёта появятся во время запуска.</p>
+        {% endif %}
+      </section>
+
+      <section class="panel diagnostics-panel">
+        <details class="log-details">
+          <summary>Показать технический лог</summary>
+          <pre class="log-output">{{ log_tail or "Лог пока пуст." }}</pre>
+        </details>
+      </section>
+    {% endif %}
+  </div>
+
+  <aside class="cabinet-sidebar" id="cabinet-sidebar">
+    <div class="cabinet-header">
+      <h2>Запуски</h2>
+      <p class="muted">Последние 20 проверок</p>
+    </div>
+    {% if runs %}
+      <div class="cabinet-list">
+        {% for run in runs %}
+          <a class="cabinet-item status-left-{{ run.status }}" href="/ui/benchmark?run_id={{ run.id }}">
+            <span class="cabinet-item-main">
+              <span class="cabinet-title">{{ run.type_label }}</span>
+              <span class="cabinet-meta">
+                {{ run.id }}
+                {% if run.aggregate.total_files %} · {{ run.aggregate.successful_files }}/{{ run.aggregate.total_files }} успешно{% endif %}
+              </span>
+            </span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="cabinet-empty">
+        <p class="muted">Запусков пока нет.</p>
+      </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if selected_run and selected_run.status == "running" %}
+<script>
+  window.setTimeout(() => window.location.reload(), 5000);
+</script>
+{% endif %}
+{% endblock %}

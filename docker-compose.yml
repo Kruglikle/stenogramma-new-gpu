@@ -1,0 +1,124 @@
+services:
+  caddy:
+    image: caddy:2.8-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${HTTP_PORT:-80}:80"
+      - "${HTTPS_BIND_ADDRESS:-127.0.0.1}:${HTTPS_PORT:-443}:443"
+    environment:
+      APP_HOST: ${APP_HOST:-localhost}
+      MAX_UPLOAD_FILE_BYTES: ${MAX_UPLOAD_FILE_BYTES:-5368709120}
+    depends_on:
+      - api
+    networks:
+      - frontend
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-audio_transcribator}
+      POSTGRES_USER: ${POSTGRES_USER:-audio_transcribator}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  vllm:
+    image: vllm/vllm-openai:latest
+    restart: unless-stopped
+    shm_size: "2gb"
+    environment:
+      HF_HUB_OFFLINE: "1"
+      VLLM_API_KEY: ${VLLM_API_KEY:?Set VLLM_API_KEY in .env}
+      VLLM_USE_FLASHINFER_SAMPLER: "0"
+    command:
+      - ${SUMMARY_MODEL:-Qwen/Qwen3-8B-AWQ}
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --api-key
+      - ${VLLM_API_KEY:?Set VLLM_API_KEY in .env}
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN:-3500}
+      - --max-num-batched-tokens
+      - "4096"
+      - --max-num-seqs
+      - "1"
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.44}
+      - --enforce-eager
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks:
+      - backend
+    volumes:
+      - ${VLLM_HF_CACHE_DIR:-./data/model_cache/vllm-huggingface}:/root/.cache/huggingface:ro
+      - vllm_cache:/root/.cache/vllm
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${API_PORT:-8001}:8001"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-audio_transcribator}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-audio_transcribator}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      WHISPERX_DEVICE: cuda
+      WHISPER_COMPUTE_TYPE: float16
+      WHISPERX_BATCH_SIZE: ${WHISPERX_BATCH_SIZE:-8}
+      PYANNOTE_DEVICE: cuda
+      VLLM_BASE_URL: http://vllm:8000/v1
+      MAX_CONCURRENT_JOBS: ${MAX_CONCURRENT_JOBS:-1}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - frontend
+      - backend
+    volumes:
+      - ./data:/app/data
+      - ${VLLM_HF_CACHE_DIR:-./data/model_cache/vllm-huggingface}:/app/data/model_cache/third_party/huggingface:ro
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  vllm_cache:
+
+networks:
+  frontend:
+  backend:
+    internal: true

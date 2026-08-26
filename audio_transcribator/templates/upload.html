@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Стенограмма | Загрузка{% endblock %}
+
+{% block content %}
+<div class="workspace-layout">
+  <div class="workspace-main">
+    <section class="panel">
+      <div class="section-header">
+        <h1>Стенограмма</h1>
+      </div>
+      <form class="form upload-form" method="post" action="/ui/upload" enctype="multipart/form-data" data-upload-form data-max-upload-bytes="{{ max_upload_file_bytes }}">
+        {% if error %}
+          <p class="error">{{ error }}</p>
+        {% endif %}
+        <label>
+          Название в кабинете
+          <input name="title" type="text" maxlength="160" placeholder="Например: Совещание">
+        </label>
+        <label>
+          Аудио или видеофайл
+          <input name="file" type="file" accept="audio/*,video/*">
+        </label>
+        <label>
+          Ссылка на видео или аудио
+          <input name="source_url" type="url" placeholder="https://example.com/video">
+        </label>
+        <label class="checkbox-field">
+          <input name="enable_summary" type="checkbox" value="1">
+          <span>Сделать резюме</span>
+        </label>
+        <label class="speaker-count-field">
+          Количество говорящих для диаризации
+          <input name="diarization_speakers" type="number" min="0" step="1" value="{{ diarization_speakers or '' }}" placeholder="Авто">
+        </label>
+        <div class="upload-progress" data-upload-progress hidden>
+          <div class="upload-progress-header">
+            <span data-upload-progress-label>Загрузка файла...</span>
+            <span data-upload-progress-percent>0%</span>
+          </div>
+          <div class="upload-progress-track">
+            <div class="upload-progress-bar" data-upload-progress-bar></div>
+          </div>
+        </div>
+        <button type="submit" data-upload-submit>Запустить обработку</button>
+      </form>
+    </section>
+  </div>
+  {% include "_cabinet_history.html" %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/cabinet.js?v=cabinet-4"></script>
+{% endblock %}

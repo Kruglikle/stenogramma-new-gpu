@@ -1,0 +1,27 @@
+{
+	admin off
+	default_sni {$APP_HOST:localhost}
+}
+
+{$APP_HOST:localhost} {
+	tls internal
+	encode zstd gzip
+	request_body {
+		max_size {$MAX_UPLOAD_FILE_BYTES:5368709120}
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	@notLocalhost not host localhost 127.0.0.1
+	header @notLocalhost Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	reverse_proxy api:8001 {
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}

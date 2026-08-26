@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Вход | Стенограмма</title>
+    <link rel="stylesheet" href="/static/styles.css?v=green-2">
+  </head>
+  <body class="auth-page">
+    <main class="auth-shell">
+      <section class="panel auth-panel">
+        <h1>Стенограмма</h1>
+        <form class="form" method="post" action="/ui/login">
+          <label>
+            Логин
+            <input name="username" autocomplete="username" required>
+          </label>
+          <label>
+            Пароль
+            <input name="password" type="password" autocomplete="current-password" required>
+          </label>
+          {% if error %}
+            <p class="error">{{ error }}</p>
+          {% endif %}
+          <button type="submit">Войти</button>
+        </form>
+      </section>
+    </main>
+  </body>
+</html>
